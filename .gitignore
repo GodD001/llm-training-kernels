@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+
+# Data, tokenizers, checkpoints, large artifacts
+data/
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.npy
+*.bin
+*.pkl
+*.nsys-rep
+*.sqlite

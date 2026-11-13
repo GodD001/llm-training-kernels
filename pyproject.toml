@@ -1,0 +1,41 @@
+[project]
+name = "llmtk"
+version = "0.1.0"
+description = "From-scratch Transformer LM training stack with a FlashAttention-2 Triton kernel."
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Chendi Li" }]
+requires-python = ">=3.11"
+dependencies = [
+    "torch>=2.4",
+    "triton>=3.0; sys_platform == 'linux'",  # Triton ships Linux wheels only
+    "einops>=0.8",
+    "numpy>=1.26",
+    "regex>=2024.0",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["llmtk*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E741"]  # Q/K/V/O/L/l/I are standard names in attention code
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"*.ipynb" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
