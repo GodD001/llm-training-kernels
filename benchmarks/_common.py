@@ -2,6 +2,7 @@
 
 import datetime as _dt
 import json
+import os
 import platform
 import statistics
 import time
@@ -11,6 +12,23 @@ from pathlib import Path
 import torch
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
+
+
+def cpu_name() -> str:
+    """Human-readable CPU model (best effort)."""
+    import subprocess
+    import sys
+
+    try:
+        if sys.platform == "darwin":
+            return subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"], text=True).strip()
+        with open("/proc/cpuinfo") as f:
+            for line in f:
+                if line.startswith("model name"):
+                    return line.split(":", 1)[1].strip()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return platform.processor() or "unknown"
 
 
 def env_info() -> dict:
@@ -29,6 +47,8 @@ def env_info() -> dict:
         "cuda": torch.version.cuda,
         "torch": torch.__version__,
         "triton": triton_version,
+        "cpu": cpu_name(),
+        "cpu_count": os.cpu_count(),
         "python": platform.python_version(),
         "platform": platform.platform(),
     }
@@ -53,10 +73,11 @@ def cuda_time(fn: Callable[[], object], warmup: int, iters: int) -> dict:
     }
 
 
-def save_results(name: str, config: dict, results: list[dict]) -> Path:
-    """Write {env, config, results} to benchmarks/results/<name>.json and return the path."""
+def save_results(name: str, config: dict, results: list[dict], summary: dict | None = None) -> Path:
+    """Write {env, config, summary, results} to benchmarks/results/<name>.json and return the path."""
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     path = RESULTS_DIR / f"{name}.json"
+    payload = {"env": env_info(), "config": config, "summary": summary or {}, "results": results}
     with open(path, "w") as f:
-        json.dump({"env": env_info(), "config": config, "results": results}, f, indent=2)
+        json.dump(payload, f, indent=2)
     return path
