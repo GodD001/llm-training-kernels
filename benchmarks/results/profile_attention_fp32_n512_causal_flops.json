@@ -1,0 +1,59 @@
+{
+  "env": {
+    "date": "2026-11-13T15:59:56+00:00",
+    "gpu": null,
+    "gpu_total_memory_gib": null,
+    "cuda": null,
+    "torch": "2.15.0",
+    "triton": null,
+    "cpu": "Apple M5",
+    "cpu_count": 10,
+    "python": "3.12.14",
+    "platform": "macOS-26.6-arm64-arm-64bit"
+  },
+  "config": {
+    "batch": 4,
+    "heads": 12,
+    "seq_len": 512,
+    "head_dim": 64,
+    "dtype": "fp32",
+    "no_causal": false,
+    "warmup": 5,
+    "iters": 20,
+    "flops_only": true,
+    "name": null
+  },
+  "summary": {
+    "softmax_flops_share": 0.019011406844106463
+  },
+  "results": [
+    {
+      "stage": "QK^T",
+      "flops": 1610612736,
+      "bytes": 62914560,
+      "flops_share": 0.4866920152091255,
+      "flops_per_byte": 25.6
+    },
+    {
+      "stage": "scale+mask",
+      "flops": 25165824,
+      "bytes": 100663296,
+      "flops_share": 0.0076045627376425855,
+      "flops_per_byte": 0.25
+    },
+    {
+      "stage": "softmax",
+      "flops": 62914560,
+      "bytes": 100663296,
+      "flops_share": 0.019011406844106463,
+      "flops_per_byte": 0.625
+    },
+    {
+      "stage": "PV",
+      "flops": 1610612736,
+      "bytes": 62914560,
+      "flops_share": 0.4866920152091255,
+      "flops_per_byte": 25.6
+    }
+  ]
+}
