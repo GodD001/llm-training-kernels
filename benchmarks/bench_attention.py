@@ -113,6 +113,11 @@ def main() -> None:
         for impl in args.impls:
             if impl == "torch_tiled" and n > args.tiled_max_n:
                 continue
+            if impl == "torch_tiled" and dtype != torch.float32:
+                # The tiled PyTorch reference only supports fp32 (P is fp32, V would be bf16).
+                if n == args.seq_lens[0]:
+                    print("torch_tiled skipped: the PyTorch reference implementation supports fp32 only")
+                continue
             for mode in args.modes:
                 row = measure(impl, mode, args.batch, n, args.head_dim, dtype, args.causal, args)
                 rows.append(row)

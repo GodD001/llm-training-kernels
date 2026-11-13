@@ -7,6 +7,9 @@ Examples:
 """
 
 import argparse
+import io
+import multiprocessing
+import os
 import random
 import time
 from pathlib import Path
@@ -43,20 +46,75 @@ def estimate_throughput(tokenizer: Tokenizer, path: str | Path, max_bytes: int =
     return n_bytes / (time.perf_counter() - start)
 
 
-def encode_dataset_to_npy(
-    tokenizer: Tokenizer, input_path: str | Path, output_path: str | Path, batch: int = 1_000_000
-) -> np.ndarray:
-    """Stream-encode a text file to a uint16 .npy without holding all ids as Python ints."""
+def _encode_lines(tokenizer: Tokenizer, lines, batch: int = 1_000_000) -> np.ndarray:
+    """Encode an iterable of lines (like a text file handle) to a uint16 array."""
     chunks, buf = [], []
-    with open(input_path, encoding="utf-8") as f:
-        for tid in tokenizer.encode_iterable(f):
-            buf.append(tid)
-            if len(buf) >= batch:
-                chunks.append(np.array(buf, dtype=np.uint16))
-                buf = []
+    for tid in tokenizer.encode_iterable(lines):
+        buf.append(tid)
+        if len(buf) >= batch:
+            chunks.append(np.array(buf, dtype=np.uint16))
+            buf = []
     if buf:
         chunks.append(np.array(buf, dtype=np.uint16))
-    arr = np.concatenate(chunks) if chunks else np.array([], dtype=np.uint16)
+    return np.concatenate(chunks) if chunks else np.array([], dtype=np.uint16)
+
+
+_WORKER_TOKENIZER: Tokenizer | None = None
+
+
+def _init_worker(tokenizer: Tokenizer) -> None:
+    global _WORKER_TOKENIZER
+    _WORKER_TOKENIZER = tokenizer
+
+
+def _encode_byte_range(args: tuple[str, int, int]) -> np.ndarray:
+    """Encode bytes [start, end) of a file line by line, exactly as iterating the file would."""
+    path, start, end = args
+    with open(path, "rb") as f:
+        f.seek(start)
+        text = f.read(end - start).decode("utf-8")
+    # StringIO with newline=None splits and translates newlines like a text-mode file handle.
+    return _encode_lines(_WORKER_TOKENIZER, io.StringIO(text, newline=None))
+
+
+def _line_aligned_ranges(path: str | Path, n_chunks: int) -> list[tuple[int, int]]:
+    """Split a file into ~n_chunks byte ranges that each end right after a newline."""
+    size = os.path.getsize(path)
+    cuts = [0]
+    with open(path, "rb") as f:
+        for i in range(1, n_chunks):
+            f.seek(max(cuts[-1], size * i // n_chunks))
+            f.readline()  # advance to the start of the next line
+            pos = f.tell()
+            if pos >= size:
+                break
+            if pos > cuts[-1]:
+                cuts.append(pos)
+    cuts.append(size)
+    return list(zip(cuts[:-1], cuts[1:], strict=True))
+
+
+def encode_dataset_to_npy(
+    tokenizer: Tokenizer,
+    input_path: str | Path,
+    output_path: str | Path,
+    batch: int = 1_000_000,
+    workers: int = 1,
+) -> np.ndarray:
+    """Encode a text file line by line to a uint16 .npy.
+
+    With workers > 1 the file is split into line-aligned byte ranges that are encoded in
+    parallel and concatenated in order; the output is identical to the single-process path.
+    """
+    if workers <= 1:
+        with open(input_path, encoding="utf-8") as f:
+            arr = _encode_lines(tokenizer, f, batch)
+    else:
+        ranges = _line_aligned_ranges(input_path, workers * 8)
+        jobs = [(str(input_path), a, b) for a, b in ranges]
+        with multiprocessing.Pool(workers, initializer=_init_worker, initargs=(tokenizer,)) as pool:
+            parts = pool.map(_encode_byte_range, jobs, chunksize=1)
+        arr = np.concatenate(parts) if parts else np.array([], dtype=np.uint16)
     np.save(output_path, arr)
     print(f"{input_path} -> {output_path} ({arr.size:,} tokens)")
     return arr
@@ -74,6 +132,7 @@ def main() -> None:
     p.add_argument("--input", help="[throughput/encode] input text file")
     p.add_argument("--max-bytes", type=int, default=10_000_000, help="[throughput] bytes to encode")
     p.add_argument("--output", help="[encode] output .npy path")
+    p.add_argument("--workers", type=int, default=1, help="[encode] parallel processes (output is identical)")
     args = p.parse_args()
 
     tok = Tokenizer.from_files(args.vocab, args.merges, special_tokens=args.special_tokens)
@@ -93,7 +152,7 @@ def main() -> None:
     else:
         if not (args.input and args.output):
             p.error("encode requires --input and --output")
-        encode_dataset_to_npy(tok, args.input, args.output)
+        encode_dataset_to_npy(tok, args.input, args.output, workers=args.workers)
 
 
 if __name__ == "__main__":

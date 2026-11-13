@@ -78,7 +78,8 @@ run_stage() {
     encode)
       for split in train valid; do
         python scripts/encode_dataset.py encode --vocab "$TOK_DIR/vocab.pkl" --merges "$TOK_DIR/merges.pkl" \
-          --input "$DATA_DIR/TinyStoriesV2-GPT4-$split.txt" --output "$DATA_DIR/ts_$split.npy"
+          --input "$DATA_DIR/TinyStoriesV2-GPT4-$split.txt" --output "$DATA_DIR/ts_$split.npy" \
+          --workers "$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
         # train.py memory-maps a flat uint16 file; np.save adds a .npy header, so write the raw array too.
         python -c "import numpy as np, sys; np.load(sys.argv[1], mmap_mode='r').tofile(sys.argv[2])" \
           "$DATA_DIR/ts_$split.npy" "$DATA_DIR/ts_$split.bin"

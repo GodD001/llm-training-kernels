@@ -170,3 +170,24 @@ def test_save_load_roundtrip(trained, tmp_path):
     assert load_merges(tmp_path / "m.pkl") == merges
     t = Tokenizer.from_files(tmp_path / "v.pkl", tmp_path / "m.pkl", special_tokens=[EOT])
     assert t.encode("the cat sat") == Tokenizer(vocab, merges, [EOT]).encode("the cat sat")
+
+
+def test_parallel_dataset_encoding_matches_sequential(trained, tmp_path, monkeypatch):
+    import importlib
+    from pathlib import Path
+
+    import numpy as np
+
+    # import the script as a normal module so spawned worker processes can import it too
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "scripts"))
+    enc = importlib.import_module("encode_dataset")
+
+    vocab, merges = trained
+    t = Tokenizer(vocab, merges, special_tokens=[EOT])
+    text = (CORPUS + "\n") * 3 + "last line without newline 🐈"
+    src = tmp_path / "in.txt"
+    src.write_text(text, encoding="utf-8")
+    seq = enc.encode_dataset_to_npy(t, src, tmp_path / "seq.npy", workers=1)
+    par = enc.encode_dataset_to_npy(t, src, tmp_path / "par.npy", workers=3)
+    assert np.array_equal(seq, par)
+    assert t.decode(par.tolist()) == text
