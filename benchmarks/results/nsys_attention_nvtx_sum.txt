@@ -1,0 +1,33 @@
+Generating SQLite file benchmarks/results/nsys_attention.sqlite from benchmarks/results/nsys_attention.nsys-rep
+Processing [benchmarks/results/nsys_attention.sqlite] with [/opt/nvidia/nsight-systems/2026.5.2/target-linux-x64/reports/nvtx_sum.py]... 
+
+ ** NVTX Range Summary (nvtx_sum):
+
+ Time (%)  Total Time (ns)  Instances   Avg (ns)     Med (ns)    Min (ns)   Max (ns)   StdDev (ns)   Style       Range    
+ --------  ---------------  ---------  -----------  -----------  ---------  ---------  -----------  -------  -------------
+     48.2        244061287          1  244061287.0  244061287.0  244061287  244061287          0.0  PushPop  :warmup      
+     21.1        106987062         25    4279482.5     108265.0     103224  104203539   20817520.3  PushPop  :scale+mask  
+     18.9         95725939         25    3829037.6      83872.0      64663   93665230   18715875.7  PushPop  :QK^T        
+      9.1         46262624         25    1850505.0     106716.0     103158   43589031    8695532.3  PushPop  :softmax     
+      0.5          2543637         25     101745.5      82599.0      73433     502418      83790.2  PushPop  :PV          
+      0.1           667252          1     667252.0     667252.0     667252     667252          0.0  PushPop  :attention_0 
+      0.1           584092          1     584092.0     584092.0     584092     584092          0.0  PushPop  :attention_1 
+      0.1           575560          1     575560.0     575560.0     575560     575560          0.0  PushPop  :attention_18
+      0.1           568045          1     568045.0     568045.0     568045     568045          0.0  PushPop  :attention_12
+      0.1           556012          1     556012.0     556012.0     556012     556012          0.0  PushPop  :attention_19
+      0.1           555252          1     555252.0     555252.0     555252     555252          0.0  PushPop  :attention_8 
+      0.1           555169          1     555169.0     555169.0     555169     555169          0.0  PushPop  :attention_13
+      0.1           555086          1     555086.0     555086.0     555086     555086          0.0  PushPop  :attention_7 
+      0.1           554271          1     554271.0     554271.0     554271     554271          0.0  PushPop  :attention_4 
+      0.1           553981          1     553981.0     553981.0     553981     553981          0.0  PushPop  :attention_16
+      0.1           550150          1     550150.0     550150.0     550150     550150          0.0  PushPop  :attention_9 
+      0.1           550137          1     550137.0     550137.0     550137     550137          0.0  PushPop  :attention_2 
+      0.1           548451          1     548451.0     548451.0     548451     548451          0.0  PushPop  :attention_3 
+      0.1           543223          1     543223.0     543223.0     543223     543223          0.0  PushPop  :attention_14
+      0.1           542154          1     542154.0     542154.0     542154     542154          0.0  PushPop  :attention_5 
+      0.1           540260          1     540260.0     540260.0     540260     540260          0.0  PushPop  :attention_17
+      0.1           537414          1     537414.0     537414.0     537414     537414          0.0  PushPop  :attention_11
+      0.1           535198          1     535198.0     535198.0     535198     535198          0.0  PushPop  :attention_10
+      0.1           532508          1     532508.0     532508.0     532508     532508          0.0  PushPop  :attention_15
+      0.1           521364          1     521364.0     521364.0     521364     521364          0.0  PushPop  :attention_6 
+

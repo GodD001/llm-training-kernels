@@ -1,5 +1,24 @@
 # Benchmark notes
 
+## A40 run (2026-11-13): caveats
+
+- **CPU quota.** The RunPod container had a cgroup CPU quota of 7.65 vCPUs on a 96-core host, so
+  the `cpu_count: 96` in the result files is the host count. BPE training ran 95 worker processes
+  on about 8 vCPUs, and its time (169 s) is an 8-vCPU number.
+- **TF32.** In fp32, Triton's `tl.dot` uses TF32 by default and the PyTorch baseline uses full
+  FP32; compare kernels in bf16 for a like-for-like comparison.
+- **PyTorch-tiled reference.** `FlashAttentionPytorch` supports fp32 only, so it is skipped in the
+  bf16 attention sweeps. It is also limited to N <= 2048, because its tile loop runs in Python.
+- **NVTX summary.** `nsys_attention_nvtx_sum.txt` shows host-side NVTX range times, which include
+  kernel launch latency; the GPU-side stage split comes from CUDA events in `profile_attention_*.json`.
+- **Throughput runs** (`train_throughput_*.json`) use random tokens, 200 steps, with 20 warmup steps
+  excluded, and take the median over 50-step windows.
+- **Training data.** `scripts/reproduce.sh encode` writes both `.npy` and raw `.bin`, and training
+  reads the `.bin` (see Known issues in the README). Encoding produced 540,796,778 train and
+  5,461,210 validation tokens (`encode_tinystories.txt`).
+- **Hyperparameters.** The 22.7M run used `configs/tinystories_22m.yaml` with bf16 + `torch.compile`
+  (lr 3e-4 → 3e-5 cosine, 200 warmup steps, wd 0.1, batch 128 × 256, 10k steps).
+
 ## Historical: course reference model (not this repo's code)
 
 These were measured during CS336 A2 §2.1.3 with the course-provided `BasicsTransformerLM`,

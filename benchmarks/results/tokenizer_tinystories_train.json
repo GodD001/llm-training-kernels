@@ -1,0 +1,50 @@
+{
+  "env": {
+    "date": "2026-11-13T16:45:53+00:00",
+    "gpu": "NVIDIA A40",
+    "gpu_total_memory_gib": 44.42,
+    "cuda": "12.8",
+    "torch": "2.8.0+cu128",
+    "triton": "3.4.0",
+    "cpu": "Intel(R) Xeon(R) Gold 6342 CPU @ 2.80GHz",
+    "cpu_count": 96,
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.39"
+  },
+  "config": {
+    "input": "/root/data/TinyStoriesV2-GPT4-train.txt",
+    "vocab_size": 10000,
+    "special_tokens": [
+      "<|endoftext|>"
+    ],
+    "num_workers": null,
+    "top_k": 10,
+    "name": "tokenizer_tinystories_train"
+  },
+  "summary": {},
+  "results": [
+    {
+      "input": "TinyStoriesV2-GPT4-train.txt",
+      "input_bytes": 2227753162,
+      "vocab_size": 10000,
+      "merges": 9743,
+      "time_s": 169.31246812595055,
+      "throughput_mb_per_s": 13.157643891546059,
+      "peak_rss_gib": 1.1158599853515625,
+      "num_workers": 95,
+      "cpu_count": 96,
+      "longest_tokens": [
+        " accomplishment",
+        " disappointment",
+        " responsibility",
+        " uncomfortable",
+        " compassionate",
+        " understanding",
+        " neighbourhood",
+        " Unfortunately",
+        " determination",
+        " encouragement"
+      ]
+    }
+  ]
+}

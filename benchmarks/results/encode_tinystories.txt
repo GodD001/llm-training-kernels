@@ -1,0 +1,3 @@
+/root/data/TinyStoriesV2-GPT4-train.txt -> /root/data/ts_train.npy (540,796,778 tokens)
+/root/data/TinyStoriesV2-GPT4-valid.txt -> /root/data/ts_valid.npy (5,461,210 tokens)
+compression ratio: 4.026 bytes/token (8,482 bytes / 2,107 tokens)

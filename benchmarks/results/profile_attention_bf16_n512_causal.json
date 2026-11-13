@@ -1,0 +1,74 @@
+{
+  "env": {
+    "date": "2026-11-13T16:35:13+00:00",
+    "gpu": "NVIDIA A40",
+    "gpu_total_memory_gib": 44.42,
+    "cuda": "12.8",
+    "torch": "2.8.0+cu128",
+    "triton": "3.4.0",
+    "cpu": "Intel(R) Xeon(R) Gold 6342 CPU @ 2.80GHz",
+    "cpu_count": 96,
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.39"
+  },
+  "config": {
+    "batch": 4,
+    "heads": 12,
+    "seq_len": 512,
+    "head_dim": 64,
+    "dtype": "bf16",
+    "no_causal": false,
+    "warmup": 5,
+    "iters": 20,
+    "flops_only": false,
+    "name": null
+  },
+  "summary": {
+    "softmax_flops_share": 0.019011406844106463,
+    "total_median_ms": 0.886815994977951,
+    "softmax_time_share": 0.4413452111660446,
+    "timing_method": "CUDA events between stages, median over iterations"
+  },
+  "results": [
+    {
+      "stage": "QK^T",
+      "flops": 1610612736,
+      "bytes": 31457280,
+      "flops_share": 0.4866920152091255,
+      "flops_per_byte": 51.2,
+      "median_ms": 0.1419679969549179,
+      "std_ms": 0.015407933237768729,
+      "time_share": 0.160087321111577
+    },
+    {
+      "stage": "scale+mask",
+      "flops": 25165824,
+      "bytes": 50331648,
+      "flops_share": 0.0076045627376425855,
+      "flops_per_byte": 0.5,
+      "median_ms": 0.28484800457954407,
+      "std_ms": 0.010645159130996168,
+      "time_share": 0.321203052485117
+    },
+    {
+      "stage": "softmax",
+      "flops": 62914560,
+      "bytes": 50331648,
+      "flops_share": 0.019011406844106463,
+      "flops_per_byte": 1.25,
+      "median_ms": 0.3913919925689697,
+      "std_ms": 0.0006046119171997108,
+      "time_share": 0.4413452111660446
+    },
+    {
+      "stage": "PV",
+      "flops": 1610612736,
+      "bytes": 31457280,
+      "flops_share": 0.4866920152091255,
+      "flops_per_byte": 51.2,
+      "median_ms": 0.0679200030863285,
+      "std_ms": 0.0004660978839120653,
+      "time_share": 0.07658860853994544
+    }
+  ]
+}

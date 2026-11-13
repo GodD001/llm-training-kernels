@@ -1,0 +1,23 @@
+......................xxx.xxX..x......xxX..x............................ [ 72%]
+............................                                             [100%]
+=============================== warnings summary ===============================
+tests/test_bpe.py::test_train_matches_naive_reference
+tests/test_bpe.py::test_train_matches_naive_reference
+  /usr/lib/python3.12/multiprocessing/popen_fork.py:66: DeprecationWarning: This process (pid=1964) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    self.pid = os.fork()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=================================== XPASSES ====================================
+=========================== short test summary info ============================
+XFAIL tests/test_flash_attention.py::test_pytorch_tiled_causal[b2-nq128-nk128-d64] - B2: FlashAttentionPytorch.forward ignores is_causal
+XFAIL tests/test_flash_attention.py::test_pytorch_tiled_causal[b1-nq100-nk100-d32] - B2: FlashAttentionPytorch.forward ignores is_causal
+XFAIL tests/test_flash_attention.py::test_pytorch_tiled_causal[b3-nq33-nk33-d16] - B2: FlashAttentionPytorch.forward ignores is_causal
+XFAIL tests/test_flash_attention.py::test_triton[b1-nq100-nk100-d32-full-float32] - B1: padded keys are not masked when N_KEYS % 16 != 0
+XFAIL tests/test_flash_attention.py::test_triton[b3-nq33-nk33-d16-full-float32] - B1: padded keys are not masked when N_KEYS % 16 != 0
+XFAIL tests/test_flash_attention.py::test_triton[b1-nq64-nk37-d16-full-float32] - B1: padded keys are not masked when N_KEYS % 16 != 0
+XFAIL tests/test_flash_attention.py::test_triton[b1-nq100-nk100-d32-full-bfloat16] - B1: padded keys are not masked when N_KEYS % 16 != 0
+XFAIL tests/test_flash_attention.py::test_triton[b3-nq33-nk33-d16-full-bfloat16] - B1: padded keys are not masked when N_KEYS % 16 != 0
+XFAIL tests/test_flash_attention.py::test_triton[b1-nq64-nk37-d16-full-bfloat16] - B1: padded keys are not masked when N_KEYS % 16 != 0
+XPASS tests/test_flash_attention.py::test_triton[b2-nq200-nk200-d64-full-float32] - B1: padded keys are not masked when N_KEYS % 16 != 0
+XPASS tests/test_flash_attention.py::test_triton[b2-nq200-nk200-d64-full-bfloat16] - B1: padded keys are not masked when N_KEYS % 16 != 0
+89 passed, 9 xfailed, 2 xpassed, 2 warnings in 30.19s

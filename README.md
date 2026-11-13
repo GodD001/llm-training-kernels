@@ -2,21 +2,29 @@
 
 From-scratch Transformer LM training stack with a fused FlashAttention-2 Triton kernel and profiling-driven optimization.
 
-The whole pipeline is implemented and tested end to end: tokenizer, model, optimizer, training loop, attention kernels, benchmarks and profiling. Every number below comes from a script in this repo and links to the JSON it wrote; anything not yet measured on a GPU is marked **TBD**.
+The whole pipeline is implemented and tested end to end: tokenizer, model, optimizer, training loop, attention kernels, benchmarks and profiling. Every number below was produced by a script in this repo, and each row links to the JSON that script wrote.
 
 ## Results
 
-| What | Result | Produced by |
-|---|---|---|
-| FlashAttention-2 (Triton) fwd+bwd vs naive attention: peak memory and latency across sequence lengths | TBD | `python -m benchmarks.bench_attention` |
-| Softmax share of attention **FLOPs** (B=4, H=12, N=512, d=64) | **1.90%** (analytic) | [`profile_attention --flops-only`](benchmarks/results/profile_attention_fp32_n512_causal_flops.json) |
-| Softmax share of attention **latency** (same shape) | TBD | `python -m benchmarks.profile_attention` |
-| bf16 vs fp32: forward latency and peak memory (GPT-2-small-sized model, ctx 512) | TBD | `python -m benchmarks.bench_model` |
-| Training throughput, fp32 vs bf16 + `torch.compile` (22.7M model) | TBD | `bash scripts/reproduce.sh throughput` |
-| TinyStories run: 22,696,448 params, 327.7M tokens, final validation loss | TBD | `bash scripts/reproduce.sh train` |
-| BPE training (vocab 10k) on TinyStories train (2.2 GB) | TBD | `python -m benchmarks.bench_tokenizer` |
+Hardware: **NVIDIA A40 (48 GB, sm86)**, CUDA 12.8, PyTorch 2.8.0, Triton 3.4.0. The container had a CPU quota of about 7.65 vCPUs (Xeon Gold 6342). Run date: 2026-11-13.
 
-Hardware: TBD. Every results JSON records the GPU/CPU model, CUDA, PyTorch and Triton versions, and the date.
+| What | Result | Source |
+|---|---|---|
+| FA-2 Triton vs unfused PyTorch attention, fwd+bwd, bf16, causal, N=8192 (B=8, d=64) | **10.3× faster** (9.7 vs 100.0 ms); extra memory **56 MiB vs 6.2 GB** | [attention_bf16_causal.json](benchmarks/results/attention_bf16_causal.json) |
+| Same, non-causal | **6.4× faster** (12.9 vs 82.5 ms) | [attention_bf16.json](benchmarks/results/attention_bf16.json) |
+| Memory scaling, fwd+bwd, bf16 | Triton grows linearly: 1.8 MiB at N=256 to 225 MiB at N=32,768. Naive grows quadratically and **runs out of memory at N=32,768** on 48 GB | [attention_bf16.json](benchmarks/results/attention_bf16.json) |
+| Softmax share of attention: FLOPs vs latency (B=4, H=12, N=512, d=64) | **1.9% of FLOPs, 42.7% of latency** (fp32); 44.1% in bf16 | [fp32](benchmarks/results/profile_attention_fp32_n512_causal.json), [bf16](benchmarks/results/profile_attention_bf16_n512_causal.json) |
+| bf16 autocast vs fp32, forward (12 layers, d=768, ctx 512, B=4) | **1.74× faster, −22.1% peak memory**; fwd+bwd 1.71×, full train step 1.57× | [model_small_ctx512.json](benchmarks/results/model_small_ctx512.json) |
+| Training throughput, 22.7M model (B=128, ctx 256) | **61.0K → 222.2K tokens/s (3.64×)** with bf16 + `torch.compile`; compile alone 1.65×, bf16 alone 1.47× | [fp32](benchmarks/results/train_throughput_fp32.json), [bf16+compile](benchmarks/results/train_throughput_bf16_compile.json) |
+| TinyStories: 22,696,448 params, 327.7M tokens, bf16 + compile | **validation loss 1.498** (200 batches), 25.3 min wall time | [train_tinystories_22m.json](benchmarks/results/train_tinystories_22m.json) |
+| Byte-level BPE, vocab 10k, TinyStories train (2.23 GB) | **169 s** (13.2 MB/s), 1.1 GiB peak RSS, on about 8 vCPUs | [tokenizer_tinystories_train.json](benchmarks/results/tokenizer_tinystories_train.json) |
+| Correctness on GPU | 89 passed; 9 expected failures are known issues, listed below | [pytest_gpu.txt](benchmarks/results/pytest_gpu.txt) |
+
+Notes:
+- "Unfused PyTorch attention" is this repo's `scaled_dot_product_attention` (explicit QKᵀ, softmax, PV), not `torch.nn.functional.scaled_dot_product_attention`.
+- Headline kernel comparisons use bf16, where both sides use the same precision. In fp32, Triton's `tl.dot` runs on TF32 tensor cores by default while the PyTorch baseline uses full FP32, so the fp32 speedups (7.1× / 11.6× at N=8192) are not apples-to-apples. Those numbers are in [attention_fp32.json](benchmarks/results/attention_fp32.json) and [attention_fp32_causal.json](benchmarks/results/attention_fp32_causal.json).
+- The throughput runs use random tokens: the compute is the same, but no dataset is needed. The full training run uses real TinyStories tokens.
+- More caveats are in [benchmarks/results/notes.md](benchmarks/results/notes.md).
 
 ## Highlights
 
@@ -40,7 +48,9 @@ Hardware: TBD. Every results JSON records the GPU/CPU model, CUDA, PyTorch and T
 
 <!-- Nsight Systems timeline of the NVTX ranges goes here: docs/images/nsys_attention.png -->
 
-In non-fused attention, QKᵀ and PV are matrix multiplies. They do about 2d FLOPs for every element they write: 25.6 FLOP/byte at d=64 in fp32 by the analytic model. Softmax does about 5 FLOPs per score but has to read and write the entire B·H·N×N score matrix, about 0.6 FLOP/byte, roughly 40× less work per byte moved. That is far below what any modern GPU needs to be compute-bound, so its runtime is set by memory bandwidth, not arithmetic. In eager PyTorch it is also several separate kernels (max, subtract, exp, sum, divide), each one a full pass over N² elements. The result is a small share of the FLOPs (1.9%) but a much larger share of the latency. Fusing softmax into the matmul tiles so scores never leave on-chip memory is exactly what FlashAttention does.
+Per-stage GPU time is measured with CUDA events (median of 20 runs), and the same ranges are wrapped in NVTX for Nsight Systems ([NVTX summary](benchmarks/results/nsys_attention_nvtx_sum.txt)). The NVTX summary reports host-side range durations, so the GPU split comes from the CUDA events.
+
+In non-fused attention, QKᵀ and PV are matrix multiplies. They do about 2d FLOPs for every element they write: 25.6 FLOP/byte at d=64 in fp32 by the analytic model. Softmax does about 5 FLOPs per score but has to read and write the entire B·H·N×N score matrix, about 0.6 FLOP/byte, roughly 40× less work per byte moved. That is far below what any modern GPU needs to be compute-bound, so its runtime is set by memory bandwidth, not arithmetic. In eager PyTorch it is also several separate kernels (max, subtract, exp, sum, divide), each one a full pass over N² elements. The measured result: softmax is **1.9% of the FLOPs but 42.7% of the latency** on an A40. Scale+mask, also elementwise over N², takes another 32%. Fusing softmax into the matmul tiles so scores never leave on-chip memory is exactly what FlashAttention does.
 
 ## Quickstart
 
