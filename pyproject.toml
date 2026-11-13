@@ -13,6 +13,7 @@ dependencies = [
     "numpy>=1.26",
     "regex>=2024.0",
     "tqdm>=4.66",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -39,3 +40,4 @@ ignore = ["E741"]  # Q/K/V/O/L/l/I are standard names in attention code
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
