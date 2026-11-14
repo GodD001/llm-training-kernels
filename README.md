@@ -4,6 +4,14 @@ From-scratch Transformer LM training stack with a fused FlashAttention-2 Triton 
 
 The whole pipeline is implemented and tested end to end: tokenizer, model, optimizer, training loop, attention kernels, benchmarks and profiling. Every number below was produced by a script in this repo, and each row links to the JSON that script wrote.
 
+## TL;DR
+
+Built to show the skills an LLM training / ML systems intern uses day to day: writing a GPU kernel, profiling to find the real bottleneck, and making a training run faster without breaking it. Three results, all on one NVIDIA A40:
+
+1. **FlashAttention-2 forward + backward in Triton**: **10.3× faster** than unfused attention at 8K tokens (bf16, causal, fwd+bwd), using **56 MiB instead of 6.2 GB** of extra memory. Memory grows linearly with sequence length instead of quadratically.
+2. **Profiling with Nsight Systems + NVTX**: memory-bound softmax takes **42.7% of attention latency** while doing only **1.9% of the FLOPs**. That gap is the reason fused attention exists.
+3. **GPT-style training stack from scratch**: **3.64× tokens/s** (61.0K → 222.2K) from bf16 autocast + `torch.compile`; a 22.7M model trained on TinyStories reaches **validation loss 1.498** in 25 minutes.
+
 ## Results
 
 Hardware: **NVIDIA A40 (48 GB, sm86)**, CUDA 12.8, PyTorch 2.8.0, Triton 3.4.0. The container had a CPU quota of about 7.65 vCPUs (Xeon Gold 6342). Run date: 2026-11-13.
@@ -34,15 +42,22 @@ Notes:
 - **Profiling-driven analysis.** Attention is split into QKᵀ, scale+mask, softmax and PV, each wrapped in an NVTX range for Nsight Systems and timed with CUDA events. This is paired with an analytic FLOPs and arithmetic-intensity model, so the latency-vs-FLOPs gap can be reproduced without a profiler.
 - **A fast byte-level BPE trainer.** Pre-tokenization runs in parallel over chunks split at document boundaries, and merges use a max-heap with incremental pair-count updates. Its merges are identical to a naive reference implementation.
 
-## What this covers for LLM engineering work
+## Relevance to LLM intern roles
 
-| Area | In this repo |
-|---|---|
-| GPU kernels and performance | Triton FA-2 forward + backward; memory and latency scaling against naive attention; bf16 vs fp32 |
-| Pre-training infrastructure | Mixed precision, `torch.compile`, throughput accounting, divergence detection, checkpointing, config-driven runs |
-| Profiling and analysis | NVTX + Nsight Systems, CUDA-event stage timing, roofline-style FLOPs/byte reasoning |
-| Tokenization and data | Parallel BPE training, streaming dataset encoding, compression-ratio and throughput tools |
-| Correctness and reproducibility | 100 tests, mostly against PyTorch or naive reference implementations (Triton cases run on CUDA); one script reproduces every measurement; results carry hardware and version metadata |
+How the work here maps to what LLM pre-training, infra and kernel interns are usually asked to do:
+
+| Typical intern task | What I did here | Where to look |
+|---|---|---|
+| Write or speed up a GPU kernel | Triton FA-2 forward + two-kernel backward (no atomics), causal tile skipping, bf16 inputs with fp32 accumulation | [flash_attention_triton.py](llmtk/kernels/flash_attention_triton.py), [backward write-up](docs/flash_attention_backward.md) |
+| Find why something is slow | NVTX + Nsight Systems, CUDA-event stage timing, analytic FLOPs and FLOP/byte model | [profile_attention.py](benchmarks/profile_attention.py), [Profiling](#profiling-why-softmax-costs-more-time-than-flops) |
+| Make a training run faster and keep it stable | bf16 autocast, `torch.compile`, honest tokens/s (warmup, eval and checkpoint time excluded), NaN/spike divergence guard, checkpointing | [training.py](llmtk/training.py), [train.py](train.py), [configs/](configs/) |
+| Implement model components correctly | RMSNorm, SwiGLU, RoPE, causal MHA, AdamW, cosine warmup schedule, gradient clipping, top-p sampling, all tested against PyTorch references | [llmtk/model/](llmtk/model/), [llmtk/optim/](llmtk/optim/), [tests/](tests/) |
+| Build data and tokenizer pipelines | Parallel byte-level BPE trainer (max-heap, incremental pair counts), streaming dataset encoding | [bpe.py](llmtk/tokenizer/bpe.py), [encode_dataset.py](scripts/encode_dataset.py) |
+| Report results others can trust | 100 tests; one script reproduces every number; results carry hardware and version metadata; known issues listed openly | [reproduce.sh](scripts/reproduce.sh), [results/](benchmarks/results/), [Known issues](#known-issues) |
+
+**Suggested 10-minute read:** the [Results](#results) table → the Triton forward kernel (`flash_fwd_kernel`) → the [backward write-up](docs/flash_attention_backward.md) → the [Profiling](#profiling-why-softmax-costs-more-time-than-flops) section.
+
+**Not covered yet:** everything runs on a single GPU. There is no multi-GPU training (DDP / FSDP / tensor parallelism), no SFT or RLHF stage, and the largest model trained is 22.7M parameters.
 
 ## Profiling: why softmax costs more time than FLOPs
 
